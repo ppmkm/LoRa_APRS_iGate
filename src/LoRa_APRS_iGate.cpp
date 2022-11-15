@@ -122,13 +122,19 @@ void setup() {
   }
 
   if (tcpip) {
+	  LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "tcpip active");
     LoRaSystem.getTaskManager().addTask(&otaTask);
     LoRaSystem.getTaskManager().addTask(&ntpTask);
     if (userConfig.ftp.active) {
+      LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "ftp active");
       LoRaSystem.getTaskManager().addTask(&ftpTask);
+    } else {
+        LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "ftp forced active");
+        LoRaSystem.getTaskManager().addTask(&ftpTask);
     }
 
     if (userConfig.aprs_is.active) {
+      LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "APRS-IS active");
       LoRaSystem.getTaskManager().addTask(&aprsIsTask);
     }
 

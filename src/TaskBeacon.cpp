@@ -43,6 +43,7 @@ bool BeaconTask::setup(System &system) {
 
   _beaconMsg = std::shared_ptr<APRSMessage>(new APRSMessage());
   _beaconMsg->setSource(system.getUserConfig()->callsign);
+  _beaconMsg->setPath("WIDE1-1");
   _beaconMsg->setDestination("APLG01");
 
   return true;

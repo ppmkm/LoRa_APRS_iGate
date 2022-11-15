@@ -89,7 +89,7 @@ bool RadiolibTask::setup(System &system) {
   }
 
   radio->setDio0Action(setFlag);
-
+  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "[%s] rxEnabled? %d", timeString().c_str(), rxEnable);
   if (rxEnable) {
     int state = startRX(RADIOLIB_SX127X_RXCONTINUOUS);
     if (state != RADIOLIB_ERR_NONE) {
@@ -128,8 +128,9 @@ bool RadiolibTask::loop(System &system) {
 
     } else { // received.
       String str;
+      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Receiving...");
       int    state = radio->readData(str);
-
+      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Received...");
       if (state != RADIOLIB_ERR_NONE) {
         system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "[%s] readData failed, code %d", timeString().c_str(), state);
       } else {
