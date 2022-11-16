@@ -109,7 +109,8 @@ bool BeaconTask::sendBeacon(System &system) {
       return false;
     }
   }
-  _beaconMsg->getBody()->setData(String("=") + create_lat_aprs(lat) + "L" + create_long_aprs(lng) + "&" + system.getUserConfig()->beacon.message);
+  _beaconMsg->setType(APRSMessageType::PositionWithoutTimestamp); //only ceremonial for local display
+  _beaconMsg->getBody()->setData("="+create_lat_aprs(lat) + "L" + create_long_aprs(lng) + "&" + system.getUserConfig()->beacon.message);
 
   system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "[%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
 
