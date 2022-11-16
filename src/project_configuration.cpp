@@ -137,6 +137,7 @@ void ProjectConfigurationManagement::writeProjectConfiguration(Configuration &co
   data["beacon"]["position"]["latitude"]  = conf.beacon.positionLatitude;
   data["beacon"]["position"]["longitude"] = conf.beacon.positionLongitude;
   data["beacon"]["use_gps"]               = conf.beacon.use_gps;
+  data["beacon"]["path"]                  = conf.beacon.path;
   data["beacon"]["timeout"]               = conf.beacon.timeout;
   data["aprs_is"]["active"]               = conf.aprs_is.active;
   data["aprs_is"]["passcode"]             = conf.aprs_is.passcode;
