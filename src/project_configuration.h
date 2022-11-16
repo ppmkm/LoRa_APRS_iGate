@@ -50,7 +50,7 @@ public:
   public:
     Beacon() : message("LoRa iGATE & Digi, Info: github.com/peterus/LoRa_APRS_iGate"), positionLatitude(0.0), positionLongitude(0.0), use_gps(false), timeout(15) {
     }
-
+    String path;
     String message;
     double positionLatitude;
     double positionLongitude;

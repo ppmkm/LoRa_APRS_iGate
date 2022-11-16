@@ -45,6 +45,8 @@ void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocumen
   conf.beacon.positionLongitude = data["beacon"]["position"]["longitude"] | 0.0;
   conf.beacon.use_gps           = data["beacon"]["use_gps"] | false;
   conf.beacon.timeout           = data["beacon"]["timeout"] | 15;
+  conf.beacon.path              = data["beacon"]["path"] | "";
+
   conf.aprs_is.active           = data["aprs_is"]["active"] | true;
 
   if (data.containsKey("aprs_is") && data["aprs_is"].containsKey("passcode"))
