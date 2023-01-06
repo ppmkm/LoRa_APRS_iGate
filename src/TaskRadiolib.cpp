@@ -23,7 +23,17 @@ void RadiolibTask::setFlag(void) {
   operationDone = true;
 }
 
+// this function is called when LoRa preamble
+  // is detected within timeout period
+  // IMPORTANT: this function MUST be 'void' type
+  //            and MUST NOT have any arguments!
+  #if defined(ESP8266) || defined(ESP32)
+    ICACHE_RAM_ATTR
+  #endif
 void RadiolibTask::setDio1Flag(void) {
+    	  if (!enableInterrupt) {
+    	    return;
+    	  }
   dio1Triggered = true;
 }
 
@@ -97,6 +107,7 @@ bool RadiolibTask::setup(System &system) {
   }
 
   radio->setDio0Action(setFlag);
+  radio->setDio1Action(setDio1Flag);
   system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "[%s] rxEnabled? %d", timeString().c_str(), rxEnable);
   if (rxEnable) {
     int state = startRX(RADIOLIB_SX127X_RXCONTINUOUS);
@@ -116,6 +127,7 @@ bool RadiolibTask::setup(System &system) {
 
 int  transmissionState = RADIOLIB_ERR_NONE;
 bool transmitFlag      = false; // Transmitting or not.
+bool receiving         = true;  //receiving data
 static int configIdx = 0;
 
 bool RadiolibTask::loop(System &system) {
@@ -136,29 +148,33 @@ bool RadiolibTask::loop(System &system) {
       txWaitTimer.setTimeout(configs[configIdx].preambleDurationMilliSec * 2);
       txWaitTimer.start();
 
-    } else { // received.
-      String str;
-      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Receiving...");
-      int    state = radio->readData(str);
-      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Received...");
-      if (state != RADIOLIB_ERR_NONE) {
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "[%s] readData failed, code %d", timeString().c_str(), state);
-      } else {
-        if (str.substring(0, 3) != "<\xff\x01") {
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "[%s] Unknown packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz%s", timeString().c_str(), str.c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
-        } else {
-          std::shared_ptr<APRSMessage> msg = std::shared_ptr<APRSMessage>(new APRSMessage());
-          msg->decode(str.substring(3));
-          _fromModem.addElement(msg);
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeString().c_str(), msg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
-          system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", msg->toString().c_str())));
-        }
+    } else { //not transmit flag -> detect/receive mode. if (transmitFlag)
+      if (receiving) { //actually was receiving
+		  operationDone = false;
+		  dio1Triggered = false;
+		  receiving = false;
+		  String str;
+		  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Receiving...");
+		  int    state = radio->readData(str);
+		  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Received...");
+		  if (state != RADIOLIB_ERR_NONE) {
+			system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "[%s] readData failed, code %d", timeString().c_str(), state);
+		  } else {
+			if (str.substring(0, 3) != "<\xff\x01") {
+			  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "[%s] Unknown packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz%s", timeString().c_str(), str.c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
+			} else {
+			  std::shared_ptr<APRSMessage> msg = std::shared_ptr<APRSMessage>(new APRSMessage());
+			  msg->decode(str.substring(3));
+			  _fromModem.addElement(msg);
+			  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeString().c_str(), msg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
+			  system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", msg->toString().c_str())));
+			}
+		  }
       }
-      operationDone = false;
     }
 
     if (rxEnable) {
-      int state = startRX(RADIOLIB_SX127X_RXCONTINUOUS);
+      int state = startRX(RADIOLIB_SX127X_RXSINGLE);
       if (state != RADIOLIB_ERR_NONE) {
         system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "[%s] startRX failed, code %d", timeString().c_str(), state);
         rxEnable = false;
@@ -205,7 +221,7 @@ int16_t RadiolibTask::startRX(uint8_t mode) {
       return state;
     }
   }
-
+  receiving = true;
   return radio->startReceive(0, mode);
 }
 
