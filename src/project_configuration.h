@@ -79,8 +79,10 @@ public:
   };
 
   class LoRa {
+
   public:
     LoRa() : frequencyRx(433775000), frequencyTx(433775000), power(20), spreadingFactor(12), signalBandwidth(125000), codingRate4(5), tx_enable(true) {
+    	preambleDurationMilliSec = ((uint64_t)(preambleLength + 4) << (spreadingFactor + 10 /* to milli-sec */)) / signalBandwidth;
     }
 
     long    frequencyRx;
@@ -91,6 +93,8 @@ public:
     long    signalBandwidth;
     int     codingRate4;
     bool    tx_enable;
+    const static uint16_t preambleLength = 8;
+	uint32_t preambleDurationMilliSec;
   };
 
   class Display {
@@ -152,6 +156,7 @@ public:
   APRS_IS aprs_is;
   Digi    digi;
   LoRa    lora;
+  LoRa    lora2;
   Display display;
   Ftp     ftp;
   MQTT    mqtt;

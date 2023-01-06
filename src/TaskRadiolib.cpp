@@ -13,6 +13,7 @@ RadiolibTask::~RadiolibTask() {
 
 volatile bool RadiolibTask::enableInterrupt = true;  // Need to catch interrupt or not.
 volatile bool RadiolibTask::operationDone   = false; // Caught IRQ or not.
+volatile bool RadiolibTask::dio1Triggered   = false; // Caught IRQ on DIO1 or not.
 
 void RadiolibTask::setFlag(void) {
   if (!enableInterrupt) {
@@ -22,12 +23,19 @@ void RadiolibTask::setFlag(void) {
   operationDone = true;
 }
 
+void RadiolibTask::setDio1Flag(void) {
+  dio1Triggered = true;
+}
+
+
 bool RadiolibTask::setup(System &system) {
   SPI.begin(system.getBoardConfig()->LoraSck, system.getBoardConfig()->LoraMiso, system.getBoardConfig()->LoraMosi, system.getBoardConfig()->LoraCS);
-  module = new Module(system.getBoardConfig()->LoraCS, system.getBoardConfig()->LoraIRQ, system.getBoardConfig()->LoraReset);
+  module = new Module(system.getBoardConfig()->LoraCS, system.getBoardConfig()->LoraIRQ, system.getBoardConfig()->LoraReset, system.getBoardConfig()->LoraGPIO);
   radio  = new SX1278(module);
 
-  config = system.getUserConfig()->lora;
+  configs[0] = system.getUserConfig()->lora;
+  configs[1] = system.getUserConfig()->lora2;
+  Configuration::LoRa config = configs[0];
 
   rxEnable = true;
   txEnable = config.tx_enable;
@@ -35,9 +43,9 @@ bool RadiolibTask::setup(System &system) {
   float freqMHz = (float)config.frequencyRx / 1000000;
   float BWkHz   = (float)config.signalBandwidth / 1000;
 
-  const uint16_t preambleLength = 8;
 
-  int16_t state = radio->begin(freqMHz, BWkHz, config.spreadingFactor, config.codingRate4, RADIOLIB_SX127X_SYNC_WORD, config.power, preambleLength, config.gainRx);
+
+  int16_t state = radio->begin(freqMHz, BWkHz, config.spreadingFactor, config.codingRate4, RADIOLIB_SX127X_SYNC_WORD, config.power, config.preambleLength, config.gainRx);
   if (state != RADIOLIB_ERR_NONE) {
     switch (state) {
     case RADIOLIB_ERR_INVALID_FREQUENCY:
@@ -100,7 +108,7 @@ bool RadiolibTask::setup(System &system) {
     }
   }
 
-  preambleDurationMilliSec = ((uint64_t)(preambleLength + 4) << (config.spreadingFactor + 10 /* to milli-sec */)) / config.signalBandwidth;
+ // preambleDurationMilliSec = ((uint64_t)(preambleLength + 4) << (config.spreadingFactor + 10 /* to milli-sec */)) / config.signalBandwidth;
 
   _stateInfo = "";
   return true;
@@ -108,8 +116,10 @@ bool RadiolibTask::setup(System &system) {
 
 int  transmissionState = RADIOLIB_ERR_NONE;
 bool transmitFlag      = false; // Transmitting or not.
+static int configIdx = 0;
 
 bool RadiolibTask::loop(System &system) {
+
   if (operationDone) { // occurs interrupt.
     enableInterrupt = false;
 
@@ -123,7 +133,7 @@ bool RadiolibTask::loop(System &system) {
       operationDone = false;
       transmitFlag  = false;
 
-      txWaitTimer.setTimeout(preambleDurationMilliSec * 2);
+      txWaitTimer.setTimeout(configs[configIdx].preambleDurationMilliSec * 2);
       txWaitTimer.start();
 
     } else { // received.
@@ -166,7 +176,7 @@ bool RadiolibTask::loop(System &system) {
           // system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "[%s] TX signal detected. Waiting TX", timeString().c_str());
         } else {
           if (!_toModem.empty()) {
-            if (config.frequencyRx == config.frequencyTx && (radio->getModemStatus() & 0x01) == 0x01) {
+            if (configs[configIdx].frequencyRx == configs[configIdx].frequencyTx && (radio->getModemStatus() & 0x01) == 0x01) {
               // system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "[%s] RX signal detected. Waiting TX", timeString().c_str());
             } else {
               std::shared_ptr<APRSMessage> msg = _toModem.getElement();
@@ -189,8 +199,8 @@ bool RadiolibTask::loop(System &system) {
 }
 
 int16_t RadiolibTask::startRX(uint8_t mode) {
-  if (config.frequencyTx != config.frequencyRx) {
-    int16_t state = radio->setFrequency((float)config.frequencyRx / 1000000);
+  if (configs[configIdx].frequencyTx != configs[configIdx].frequencyRx) {
+    int16_t state = radio->setFrequency((float)configs[configIdx].frequencyRx / 1000000);
     if (state != RADIOLIB_ERR_NONE) {
       return state;
     }
@@ -200,8 +210,8 @@ int16_t RadiolibTask::startRX(uint8_t mode) {
 }
 
 int16_t RadiolibTask::startTX(String &str) {
-  if (config.frequencyTx != config.frequencyRx) {
-    int16_t state = radio->setFrequency((float)config.frequencyTx / 1000000);
+  if (configs[configIdx].frequencyTx != configs[configIdx].frequencyRx) {
+    int16_t state = radio->setFrequency((float)configs[configIdx].frequencyTx / 1000000);
     if (state != RADIOLIB_ERR_NONE) {
       return state;
     }

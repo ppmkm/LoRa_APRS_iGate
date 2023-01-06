@@ -67,6 +67,17 @@ void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocumen
   conf.lora.codingRate4     = data["lora"]["coding_rate4"] | 5;
   conf.lora.tx_enable       = data["lora"]["tx_enable"] | true;
 
+  //szerokie tory w SP
+  conf.lora2.frequencyRx     = data["lora2"]["frequency_rx"] | 434855000;
+  conf.lora2.gainRx          = data["lora2"]["gain_rx"] | 0;
+  conf.lora2.frequencyTx     = data["lora2"]["frequency_tx"] | 434855000;
+  conf.lora2.power           = data["lora2"]["power"] | 20;
+  conf.lora2.spreadingFactor = data["lora2"]["spreading_factor"] | 9;
+  conf.lora2.signalBandwidth = data["lora2"]["signal_bandwidth"] | 125000;
+  conf.lora2.codingRate4     = data["lora2"]["coding_rate4"] | 7;
+  conf.lora2.tx_enable       = data["lora2"]["tx_enable"] | true;
+
+
   conf.display.alwaysOn     = data["display"]["always_on"] | true;
   conf.display.timeout      = data["display"]["timeout"] | 10;
   conf.display.overwritePin = data["display"]["overwrite_pin"] | 0;

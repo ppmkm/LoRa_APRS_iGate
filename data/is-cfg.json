@@ -53,6 +53,16 @@
 		"coding_rate4": 5,
 		"tx_enable": false
 	},
+	"lora2": {
+		"frequency_rx": 434855000,
+		"gain_rx": 0,
+		"frequency_tx": 434855000,
+		"power": 20,
+		"spreading_factor": 9,
+		"signal_bandwidth": 125000,
+		"coding_rate4": 7,
+		"tx_enable": false
+	},
 	"display": {
 		"always_on": true,
 		"timeout": 10,

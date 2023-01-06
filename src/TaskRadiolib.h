@@ -19,7 +19,7 @@ private:
   Module *module;
   SX1278 *radio;
 
-  Configuration::LoRa config;
+  Configuration::LoRa configs[2];
 
   bool rxEnable, txEnable;
 
@@ -28,13 +28,15 @@ private:
 
   static volatile bool enableInterrupt; // Need to catch interrupt or not.
   static volatile bool operationDone;   // Caught IRQ or not.
+  static volatile bool dio1Triggered;   // Caught IRQ on DIO1 or not.
 
   static void setFlag(void);
+  static void setDio1Flag(void);
 
   int16_t startRX(uint8_t mode);
   int16_t startTX(String &str);
 
-  uint32_t preambleDurationMilliSec;
+//  uint32_t preambleDurationMilliSec;
   Timer    txWaitTimer;
 };
 
