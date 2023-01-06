@@ -132,7 +132,7 @@ static int configIdx = 0;
 
 bool RadiolibTask::loop(System &system) {
 
-  if (operationDone) { // occurs interrupt.
+  if (operationDone || dio1Triggered) { // occurs interrupt.
     enableInterrupt = false;
 
     if (transmitFlag) { // transmitted.
@@ -149,7 +149,7 @@ bool RadiolibTask::loop(System &system) {
       txWaitTimer.start();
 
     } else { //not transmit flag -> detect/receive mode. if (transmitFlag)
-      if (receiving) { //actually was receiving
+        if (receiving) { //actually was receiving
 		  operationDone = false;
 		  dio1Triggered = false;
 		  receiving = false;
@@ -170,16 +170,34 @@ bool RadiolibTask::loop(System &system) {
 			  system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", msg->toString().c_str())));
 			}
 		  }
+      } else
+          // check if we got a preamble
+          if(dio1Triggered) {
+            // LoRa preamble was detected
+            //Serial.print(F("[SX1278] Preamble detected, starting reception ... "));
+            int state = radio->startReceive(0, RADIOLIB_SX127X_RXSINGLE);
+            //showOnScreen("Preamble RX... ", "", "","");
+            if (state != RADIOLIB_ERR_NONE) {
+          	  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(),"[%s] startReceive single failed, code %d",timeString().c_str(), state);
+            }
+            // set the flag for ongoing reception
+            receiving = true;
+          } else { //not receiving  and not detected
+		   int state = radio->startChannelScan();
+		   if (state != RADIOLIB_ERR_NONE) {
+			  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(),"[%s] startChannelScan failed, code %d",timeString().c_str(), state);
+		   }
       }
     }
 
-    if (rxEnable) {
-      int state = startRX(RADIOLIB_SX127X_RXSINGLE);
-      if (state != RADIOLIB_ERR_NONE) {
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "[%s] startRX failed, code %d", timeString().c_str(), state);
-        rxEnable = false;
-      }
-    }
+//    if (rxEnable) {
+//      int state = startRX(RADIOLIB_SX127X_RXCONTINUOUS);
+//      if (state != RADIOLIB_ERR_NONE) {
+//        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "[%s] startRX failed, code %d", timeString().c_str(), state);
+//        rxEnable = false;
+//      }
+//      Serial.println("r");
+//    }
 
     enableInterrupt = true;
   } else { // not interrupt.
@@ -224,6 +242,8 @@ int16_t RadiolibTask::startRX(uint8_t mode) {
   receiving = true;
   return radio->startReceive(0, mode);
 }
+
+
 
 int16_t RadiolibTask::startTX(String &str) {
   if (configs[configIdx].frequencyTx != configs[configIdx].frequencyRx) {
