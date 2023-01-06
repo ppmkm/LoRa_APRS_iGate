@@ -110,16 +110,16 @@ bool RadiolibTask::setup(System &system) {
   radio->setDio1Action(setDio1Flag);
   system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "[%s] rxEnabled? %d", timeString().c_str(), rxEnable);
   if (rxEnable) {
-    int state = startRX(RADIOLIB_SX127X_RXCONTINUOUS);
+	int state = radio->startChannelScan();
     if (state != RADIOLIB_ERR_NONE) {
-      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "[%s] startRX failed, code %d", timeString().c_str(), state);
+      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "[%s] startChannelScan failed, code %d", timeString().c_str(), state);
       rxEnable   = false;
       _stateInfo = "LoRa-Modem failed";
       _state     = Error;
     }
+    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "[%s] initial startChannelScan", timeString().c_str());
   }
 
- // preambleDurationMilliSec = ((uint64_t)(preambleLength + 4) << (config.spreadingFactor + 10 /* to milli-sec */)) / config.signalBandwidth;
 
   _stateInfo = "";
   return true;
@@ -127,7 +127,7 @@ bool RadiolibTask::setup(System &system) {
 
 int  transmissionState = RADIOLIB_ERR_NONE;
 bool transmitFlag      = false; // Transmitting or not.
-bool receiving         = true;  //receiving data
+static volatile bool receiving = false;  //receiving data
 static int configIdx = 0;
 
 bool RadiolibTask::loop(System &system) {
@@ -143,6 +143,7 @@ bool RadiolibTask::loop(System &system) {
         system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "[%s] transmitFlag failed, code %d", timeString().c_str(), transmissionState);
       }
       operationDone = false;
+      dio1Triggered = false;
       transmitFlag  = false;
 
       txWaitTimer.setTimeout(configs[configIdx].preambleDurationMilliSec * 2);
@@ -153,7 +154,7 @@ bool RadiolibTask::loop(System &system) {
 		  operationDone = false;
 		  dio1Triggered = false;
 		  receiving = false;
-		  String str;
+		  String str = String("");
 		  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Receiving...");
 		  int    state = radio->readData(str);
 		  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Received...");
@@ -170,35 +171,35 @@ bool RadiolibTask::loop(System &system) {
 			  system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", msg->toString().c_str())));
 			}
 		  }
-      } else
-          // check if we got a preamble
-          if(dio1Triggered) {
-            // LoRa preamble was detected
-            //Serial.print(F("[SX1278] Preamble detected, starting reception ... "));
-            int state = radio->startReceive(0, RADIOLIB_SX127X_RXSINGLE);
-            //showOnScreen("Preamble RX... ", "", "","");
-            if (state != RADIOLIB_ERR_NONE) {
-          	  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(),"[%s] startReceive single failed, code %d",timeString().c_str(), state);
-            }
-            // set the flag for ongoing reception
-            receiving = true;
-          } else { //not receiving  and not detected
-		   int state = radio->startChannelScan();
-		   if (state != RADIOLIB_ERR_NONE) {
-			  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(),"[%s] startChannelScan failed, code %d",timeString().c_str(), state);
-		   }
       }
+      // check if we got a preamble
+      if(dio1Triggered) {
+		  operationDone = false;
+		  dio1Triggered = false;
+         // LoRa preamble was detected
+         system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(),"preamble detected...");
+         int state = radio->startReceive(0, RADIOLIB_SX127X_RXSINGLE);
+         if (state != RADIOLIB_ERR_NONE) {
+           system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(),"[%s] startReceive single failed, code %d",timeString().c_str(), state);
+         } else {
+           // set the flag for ongoing reception
+           receiving = true;
+         }
+      }
+
     }
 
-//    if (rxEnable) {
-//      int state = startRX(RADIOLIB_SX127X_RXCONTINUOUS);
-//      if (state != RADIOLIB_ERR_NONE) {
-//        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "[%s] startRX failed, code %d", timeString().c_str(), state);
-//        rxEnable = false;
-//      }
-//      Serial.println("r");
-//    }
+	if (rxEnable && !receiving) {
+	  int state = radio->startChannelScan();
+	  if (state != RADIOLIB_ERR_NONE) {
+		  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(),"[%s] startChannelScan failed, code %d",timeString().c_str(), state);
+	  }
+	}
 
+
+
+    dio1Triggered = false;
+    operationDone = false;
     enableInterrupt = true;
   } else { // not interrupt.
     if (!txWaitTimer.check()) {
